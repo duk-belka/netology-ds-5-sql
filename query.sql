@@ -1,11 +1,3 @@
--- Список видео
-select *
-from video;
-
--- Список пользователей
-select *
-from "user";
-
 -- Количество оценок постов и просмотров видео по пользователям
 select u.id, count(v) video_view_count, count(r) reaction_count
 from "user" u
@@ -69,3 +61,34 @@ from "user" u
        cross join user_reaction enother_user_reaction
 where enother_user_reaction.user_id <> u.id
 order u.id asc, by likes_matches desc, dislikes_matches desc;
+
+-- Самые перепросматриваемые видео в порядке уменьшения количества просмотров
+select v.id,
+       count(view)                                              view_count,
+       count(view)::float / count(distinct view.user_id)::float rewatch_coefficient
+from video v
+       join video_view view on view.video_id = v.id
+group by v.id
+having count(view)::float / count(distinct view.user_id)::float > 1
+order by view_count desc, rewatch_coefficient desc;
+
+-- Конверсия в реакции для пользователей
+select u.id, count(view)::float / count(r)::float reaction_conversion
+from "user" u
+       left join reaction r on r.user_id = u.id
+       left join video_view view on view.user_id = u.id
+group by u.id;
+
+-- Среднее количество просмотренных видео в день для каждого пользователя (я понимаю, что это не очень честная выгрузка)
+select u.id, count(video_view)::float / (now()::date - u.created_at::date)::integer
+from "user" u
+       join video_view on user_id = u.id
+group by u.id;
+
+
+-- Процент дизлайков из оценок каждого пользователя
+select u.id,
+       (100 * count(case when r.type = 'dislike' then 1 end)::float / count(r)::float)
+from "user" u
+       join reaction r on u.id = r.user_id
+group by u.id;
